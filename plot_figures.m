@@ -1,15 +1,13 @@
-function plot_v2_final_v1style(outDir)
-% PLOT_V2_FINAL_V1STYLE Alternative V2 figure set in the Version 1 dashboard arrangement
-% (RL_WSN_Periyar/run_final_project_dashboards.m, graphs 1-5, and
-% RL_WSN_Periyar/figures/generate_rl_hybrid_learning_comparison.m, graph 6): 2 x 3 tiles with three line
+function plot_figures(outDir)
+% PLOT_FIGURES The six result figures as dashboards of 2 x 3 tiles with three line
 % panels (operational nodes, cumulative delivery ratio, total residual energy; mean and +-1 sample SD band),
 % two bar panels (energy per delivered report; operational nodes at the last round; mean bar, SD whisker
-% and the five seed values as circles) and a five-seed summary table. V1 sizes, fonts and colours.
-% Data: results/v2_results_500rounds_report_preserving.mat (seeds 42-46, rounds 1-500). Nothing is simulated.
-% Writes figures/V1_STYLE_ALTERNATIVE/V2_G#_V1Style.png (300 dpi) and .fig; never overwrites.
-    cfg = v2_config(); addpath(fullfile(cfg.root, 'simulation'));
-    if nargin < 1, outDir = fullfile(cfg.root, 'figures', 'V1_STYLE_ALTERNATIVE'); end
-    S = load(fullfile(cfg.root, 'results', 'v2_results_500rounds_report_preserving.mat'), 'R'); R = S.R;
+% and the five seed values as circles) and a five-seed summary table.
+% Data: results/results_500rounds.mat (seeds 42-46, rounds 1-500). Nothing is simulated.
+% Writes outDir/G#_*.png (300 dpi) and .fig (default outDir: figures/); never overwrites.
+    cfg = wsn_config(); addpath(fullfile(cfg.root, 'simulation'));
+    if nargin < 1, outDir = fullfile(cfg.root, 'figures'); end
+    S = load(fullfile(cfg.root, 'results', 'results_500rounds.mat'), 'R'); R = S.R;
     Rn = R.config.numRounds; V = R.workload.available; N = R.config.numNodes;
     W = create_periyar_workload_continuous(load_consdata_xlsx(cfg.workbook), Rn, 'uniform', R.config.sensingNodes, N, R.config.scheduleRounds);
     validCum = cumsum(cellfun(@numel, W.round_obs));
@@ -20,23 +18,23 @@ function plot_v2_final_v1style(outDir)
 
     blue = [0.12 0.47 0.71]; orange = [0.85 0.37 0.01];
     note = sprintf(['Mean of seeds 42-46; bands and whiskers \\pm 1 sample SD; circles = seed values (descriptive). ' ...
-        'Delivery ratio = delivered / valid reports (%s). Operational = protocol-duty availability. V2: 10 nodes, rounds 1-%d.'], commas(V), Rn);
-    G = {   % file, title, members (V1 order), V1 colours, paired (RL, parent), footnote suffix, V1 template
-        'V2_G1_V1Style', 'Conventional Protocols vs RL-Hybrid', {'LEACH', 'DEEC', 'PEGASIS', 'RL-Hybrid'}, ...
+        'Delivery ratio = delivered / valid reports (%s). Operational = protocol-duty availability. 10 nodes, rounds 1-%d.'], commas(V), Rn);
+    G = {   % file, title, members, colours, paired (RL, parent), footnote suffix, template
+        'G1_Conventional_vs_RL_Hybrid', 'Conventional Protocols vs RL-Hybrid', {'LEACH', 'DEEC', 'PEGASIS', 'RL-Hybrid'}, ...
             {blue, [0.17 0.63 0.17], [0.58 0.40 0.74], [0.80 0.15 0.45]}, [], '', 1
-        'V2_G2_V1Style', 'LEACH vs LEACH-RL v5', {'LEACH', 'LEACH-RL v5'}, {blue, orange}, [2 1], ' LEACH-RL: v5.', 1
-        'V2_G3_V1Style', 'DEEC vs DEEC-RL v5', {'DEEC', 'DEEC-RL v5'}, {blue, [0.11 0.62 0.47]}, [2 1], ' DEEC-RL: v5.', 1
-        'V2_G4_V1Style', 'PEGASIS vs PEGASIS-RL v5', {'PEGASIS', 'PEGASIS-RL v5'}, {blue, orange}, [2 1], ' PEGASIS-RL: v5.', 1
-        'V2_G5_V1Style', 'RL-Hybrid vs LEACH-RL v5 vs DEEC-RL v5 vs PEGASIS-RL v5', {'RL-Hybrid', 'LEACH-RL v5', 'DEEC-RL v5', 'PEGASIS-RL v5'}, ...
+        'G2_LEACH_vs_RL_LEACH', 'LEACH vs RL-LEACH', {'LEACH', 'RL-LEACH'}, {blue, orange}, [2 1], '', 1
+        'G3_DEEC_vs_RL_DEEC', 'DEEC vs RL-DEEC', {'DEEC', 'RL-DEEC'}, {blue, [0.11 0.62 0.47]}, [2 1], '', 1
+        'G4_PEGASIS_vs_RL_PEGASIS', 'PEGASIS vs RL-PEGASIS', {'PEGASIS', 'RL-PEGASIS'}, {blue, orange}, [2 1], '', 1
+        'G5_RL_Hybrid_vs_RL_Extensions', 'RL-Hybrid vs RL-LEACH vs RL-DEEC vs RL-PEGASIS', {'RL-Hybrid', 'RL-LEACH', 'RL-DEEC', 'RL-PEGASIS'}, ...
             {[0.80 0.15 0.45], orange, [0.46 0.44 0.70], [0.11 0.62 0.47]}, [], ' Different architectures, not a paired comparison.', 1
-        'V2_G6_V1Style', 'RL-Hybrid: Q-Learning Method Comparison', {'Tabular Q', 'Double Q', 'Double DQN', 'Dueling Double DQN'}, ...
-            {[0.85 0.10 0.55], [0.00 0.40 0.85], [0.00 0.62 0.45], [0.95 0.50 0.00]}, [], ' Same RL-Hybrid problem for all four learners; Tabular Q = RL-Hybrid.', 2};
+        'G6_Q_Learning_Methods', 'RL-Hybrid: Q-Learning Method Comparison', {'Tabular Q-learning', 'Double Q-learning', 'Double DQN', 'Dueling DDQN'}, ...
+            {[0.85 0.10 0.55], [0.00 0.40 0.85], [0.00 0.62 0.45], [0.95 0.50 0.00]}, [], ' Same RL-Hybrid problem for all four learners; Tabular Q-learning = RL-Hybrid.', 2};
     for g = 1:size(G, 1)
         base = fullfile(outDir, G{g, 1});
         assert(~isfile([base '.png']) && ~isfile([base '.fig']), '%s already exists; not overwriting', base);
         M = P(cellfun(@(n) find(strcmp(names, n)), G{g, 3}));
         fig = dashboard(M, G{g, 4}, G{g, 2}, [note G{g, 6}], G{g, 5}, G{g, 7}, Rn, N, V);
-        % Rendered about 3,750 px wide: at a full 300 dpi on V1's 1800-2300 px canvases the renderer truncated
+        % Rendered about 3,750 px wide: at a full 300 dpi on the 1800-2300 px canvases the renderer truncated
         % or garbled text in the text-heavy figures. Saved with 300-dpi print metadata (about 12.5 in wide).
         dpi = round(3750 / fig.Position(3) * get(groot, 'ScreenPixelsPerInch'));
         tmp = [tempname '.png']; exportgraphics(fig, tmp, 'Resolution', dpi); I = imread(tmp); delete(tmp);
@@ -47,7 +45,7 @@ function plot_v2_final_v1style(outDir)
 end
 
 function fig = dashboard(M, cols, ttl, note, pairIdx, tpl, Rn, N, V)
-% V1 template 1 (graphs 1-5) or 2 (graph 6, larger fonts).
+% Template 1 (graphs 1-5) or 2 (graph 6, larger fonts).
     if tpl == 1
         z = struct('pos', [50 50 1800 1050], 'title', 15, 'ax', [], 'lab', [], 'sub', [], 'lw', 2, 'alpha', 0.15, ...
             'leg', {{'best', 'best', 'best'}}, 'legFs', [], 'table', 11, 'note', 9);
@@ -58,7 +56,7 @@ function fig = dashboard(M, cols, ttl, note, pairIdx, tpl, Rn, N, V)
     fig = figure('Visible', 'off', 'Color', 'w', 'Units', 'pixels', 'Position', z.pos);
     if exist('theme', 'file'), theme(fig, 'light'); end
     tl = tiledlayout(fig, 2, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
-    tl.OuterPosition = [0 0.05 1 0.95];   % thin strip for the one-line footnote (as V1)
+    tl.OuterPosition = [0 0.05 1 0.95];   % thin strip for the one-line footnote
     title(tl, ttl, 'FontWeight', 'bold', 'FontSize', z.title);
     r = 1:Rn;
     spec = {'alive', 'Operational nodes', '1. Operational nodes vs round', [0 N]
@@ -76,7 +74,7 @@ function fig = dashboard(M, cols, ttl, note, pairIdx, tpl, Rn, N, V)
         for k = 1:numel(M)
             plot(ax, r, mean(M(k).(spec{p, 1}), 1), 'Color', cols{k}, 'LineWidth', z.lw, 'DisplayName', M(k).name);
         end
-        yl = spec{p, 4}; ylim(ax, [min(yl(1), floor(lo)) max(yl(2), ceil(hi))]);   % never hides data (as V1)
+        yl = spec{p, 4}; ylim(ax, [min(yl(1), floor(lo)) max(yl(2), ceil(hi))]);   % never hides data
         xlim(ax, [1 Rn]); xlabel(ax, 'Round'); ylabel(ax, spec{p, 2}); title(ax, spec{p, 3});
         if ~isempty(z.lab), ax.XLabel.FontSize = z.lab; ax.YLabel.FontSize = z.lab; ax.Title.FontSize = z.sub; end
         lg = legend(ax, 'Location', z.leg{p}, 'Interpreter', 'none'); if ~isempty(z.legFs), lg.FontSize = z.legFs; end
@@ -91,7 +89,7 @@ function fig = dashboard(M, cols, ttl, note, pairIdx, tpl, Rn, N, V)
 end
 
 function barPanel(ax, M, cols, field, ylab, ttl, z)
-% V1 bar panel: mean bar, +-1 sample SD whisker, the five seed values as circles.
+% Bar panel: mean bar, +-1 sample SD whisker, the five seed values as circles.
     hold(ax, 'on'); grid(ax, 'on'); box(ax, 'on'); n = numel(M);
     if ~isempty(z.ax), set(ax, 'FontSize', z.ax); end
     for k = 1:n
@@ -102,13 +100,13 @@ function barPanel(ax, M, cols, field, ylab, ttl, z)
     end
     set(ax, 'XTick', 1:n, 'XTickLabel', {M.name}, 'TickLabelInterpreter', 'none'); xlim(ax, [0.4 n + 0.6]);
     top = max(arrayfun(@(k) max([M(k).(field), mean(M(k).(field)) + std(M(k).(field), 0)]), 1:n));
-    ylim(ax, [0 1.1 * top]);   % headroom so no seed circle sits on the frame (as V1)
+    ylim(ax, [0 1.1 * top]);   % headroom so no seed circle sits on the frame
     ylabel(ax, ylab); title(ax, ttl);
     if ~isempty(z.lab), ax.YLabel.FontSize = z.lab; ax.Title.FontSize = z.sub; end
 end
 
 function summaryTable(ax, M, cols, pairIdx, fs, V)
-% V1 table layout (colour squares, aligned columns, paired note) with the V2 summary metrics.
+% Summary table (colour squares, aligned columns, paired note).
     hold(ax, 'on'); set(ax, 'XLim', [0 1], 'YLim', [0 1]);
     text(ax, 0, 0.98, 'Five-seed summary at round 500 (mean \pm SD, n = 5)', 'FontWeight', 'bold', 'FontSize', fs + 1, 'VerticalAlignment', 'top');
     xs = [0.42 0.60 0.775 0.935];

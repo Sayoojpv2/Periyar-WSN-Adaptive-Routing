@@ -1,34 +1,34 @@
-function R = run_v2_report_preserving()
-% RUN_V2_REPORT_PRESERVING All 11 methods of the final figure set (seeds 42-46, rounds 1-500) under one common
-% energy model in which a frame carrying m station reports is charged as m packets (the delivery metric
-% counts every report). Only the frames that previously carried several reports in one packet change:
-% LEACH/DEEC(-RL v5) cluster head -> BS (protocols/*_RP.m), PEGASIS(-RL v5) chain and leader -> BS
-% (protocols/*_EA.m with reportPreservingPackets, plus the leader-aggregation double-count fix), and the
-% RL-Hybrid / learner relay route (protocols/RL_Hybrid*_RP.m). Rewards, states, learning parameters,
-% topology, workload, radio parameters, 2 J and the death rule are unchanged.
-% Saves results/v2_results_500rounds_report_preserving.mat; never overwrites.
-    cfg = v2_config(); cfg.numRounds = 500;
+function R = run_experiment(outFile)
+% RUN_EXPERIMENT All 11 methods (seeds 42-46, rounds 1-500) under one common energy model in which a
+% frame carrying m station reports is charged as m packets (the delivery metric counts every report). This
+% applies to the cluster head -> BS frames of LEACH, DEEC, RL-LEACH and RL-DEEC, the chain and leader -> BS
+% frames of PEGASIS and RL-PEGASIS (reportPreservingPackets, with the leader fusion charged once), and the
+% relay route of RL-Hybrid and its learners. Rewards, states, learning parameters, topology, workload, radio
+% parameters, 2 J and the death rule are the same for all methods.
+% outFile (default results/results_500rounds.mat) is never overwritten. Positions and workload are checked
+% against results/reference_layout.mat.
+    cfg = wsn_config(); cfg.numRounds = 500;
     addpath(fullfile(cfg.root, 'protocols'), fullfile(cfg.root, 'simulation'));
-    out = fullfile(cfg.root, 'results', 'v2_results_500rounds_report_preserving.mat');
+    out = fullfile(cfg.root, 'results', 'results_500rounds.mat'); if nargin > 0, out = outFile; end
     assert(~isfile(out), '%s exists; not overwriting', out);
-    B = load(fullfile(cfg.root, 'results', 'v2_results_500rounds_corrected_detailed.mat'), 'R'); base = B.R;
+    base = load(fullfile(cfg.root, 'results', 'reference_layout.mat'), 'positions', 'workload');
     W = create_periyar_workload_continuous(load_consdata_xlsx(cfg.workbook), cfg.numRounds, 'uniform', cfg.sensingNodes, cfg.numNodes, cfg.scheduleRounds);
     assert(sum(cellfun(@numel, W.round_obs)) == base.workload.available);
     ea = struct('chargeFailedRx', false, 'singleLeaderAggregation', true, 'reportPreservingPackets', true);
-    names = {'LEACH', 'DEEC', 'PEGASIS', 'LEACH-RL v5', 'DEEC-RL v5', 'PEGASIS-RL v5', 'RL-Hybrid', ...
-        'Tabular Q', 'Double Q', 'Double DQN', 'Dueling Double DQN'};
+    names = {'LEACH', 'DEEC', 'PEGASIS', 'RL-LEACH', 'RL-DEEC', 'RL-PEGASIS', 'RL-Hybrid', ...
+        'Tabular Q-learning', 'Double Q-learning', 'Double DQN', 'Dueling DDQN'};
     runners = {
-        @(e, lq, sh, sd) LEACH_RP(e, lq, sh, sd, W)
-        @(e, lq, sh, sd) DEEC_RP(e, lq, sh, sd, W)
-        @(e, lq, sh, sd) PEGASIS_EA(e, lq, sh, sd, W, ea)
-        @(e, lq, sh, sd) RL_LEACH_v5_RP(e, [], sh, sd, W, 'active')
-        @(e, lq, sh, sd) RL_DEEC_v5_RP(e, [], sh, sd, W, 'active', struct('beta', 16))
-        @(e, lq, sh, sd) RL_PEGASIS_v5_EA(e, [], sh, sd, W, 'active', struct('energyGuard', 0.5), ea)
-        @(e, lq, sh, sd) RL_Hybrid_RP(e, [], sh, sd, W)
-        @(e, lq, sh, sd) RL_Hybrid_LearnerComparison_RP(e, [], sh, sd, W, 'tabularQ')
-        @(e, lq, sh, sd) RL_Hybrid_LearnerComparison_RP(e, [], sh, sd, W, 'doubleQ')
-        @(e, lq, sh, sd) RL_Hybrid_LearnerComparison_RP(e, [], sh, sd, W, 'doubleDQN')
-        @(e, lq, sh, sd) RL_Hybrid_LearnerComparison_RP(e, [], sh, sd, W, 'duelingDoubleDQN')};
+        @(e, lq, sh, sd) LEACH(e, lq, sh, sd, W)
+        @(e, lq, sh, sd) DEEC(e, lq, sh, sd, W)
+        @(e, lq, sh, sd) PEGASIS(e, lq, sh, sd, W, ea)
+        @(e, lq, sh, sd) RL_LEACH(e, [], sh, sd, W, 'active')
+        @(e, lq, sh, sd) RL_DEEC(e, [], sh, sd, W, 'active', struct('beta', 16))
+        @(e, lq, sh, sd) RL_PEGASIS(e, [], sh, sd, W, 'active', struct('energyGuard', 0.5), ea)
+        @(e, lq, sh, sd) RL_Hybrid(e, [], sh, sd, W)
+        @(e, lq, sh, sd) RL_Hybrid_LearnerComparison(e, [], sh, sd, W, 'tabularQ')
+        @(e, lq, sh, sd) RL_Hybrid_LearnerComparison(e, [], sh, sd, W, 'doubleQ')
+        @(e, lq, sh, sd) RL_Hybrid_LearnerComparison(e, [], sh, sd, W, 'doubleDQN')
+        @(e, lq, sh, sd) RL_Hybrid_LearnerComparison(e, [], sh, sd, W, 'duelingDoubleDQN')};
     series = {'alive', 'dead', 'energy', 'cumDelivered', 'cumPDR', 'delay', 'cumMeanDelay', ...
         'usableEnergy', 'generatedPerRound', 'attemptedPerRound', 'lostPerRound', 'unattemptedPerRound'};
     scal = {'pdr', 'delivered', 'scheduled', 'residual', 'epr', 'meanDelay', 'meanDelayPacket', 'fnd', 'hnd', 'lnd', 'finalAlive', 'energyClosureError', ...
@@ -42,17 +42,17 @@ function R = run_v2_report_preserving()
     end
     tabularEqualsHybrid = false(1, S);
     for s = 1:S
-        seed = seeds(s); [env, lq, sh] = generate_scenario_v2(seed, cfg);
+        seed = seeds(s); [env, lq, sh] = generate_scenario(seed, cfg);
         assert(isequal(env.X, base.positions(s).X) && isequal(env.Y, base.positions(s).Y), 'topology differs');
         for p = 1:P
             t = tic; res = runners{p}(env, lq, sh, seed); prot(p).runtime(s) = toc(t);
-            m = extract_v2_metrics(res, env);
+            m = extract_metrics(res, env);
             assert(m.energyClosureError < 1e-8, '%s seed %d: energy does not close', names{p}, seed);
             assert(all(m.nodeEnergy(:) >= 0) && all(diff(m.nodeEnergy, 1, 2) <= 1e-15, 'all') && all(diff(double(m.nodeAlive), 1, 2) <= 0, 'all'), '%s: energy/status monotonicity', names{p});
             for f = series, prot(p).(f{1})(s, :) = m.(f{1}); end
             for f = scal, prot(p).(f{1})(s) = m.(f{1}); end
             prot(p).nodeEnergy(s, :, :) = reshape(m.nodeEnergy, 1, N, Rn); prot(p).nodeAlive(s, :, :) = reshape(m.nodeAlive, 1, N, Rn);
-            if strcmp(names{p}, 'RL-Hybrid'), hyb = m; elseif strcmp(names{p}, 'Tabular Q'), tabularEqualsHybrid(s) = isequal(m.cumDelivered, hyb.cumDelivered) && isequal(m.energy, hyb.energy); end
+            if strcmp(names{p}, 'RL-Hybrid'), hyb = m; elseif strcmp(names{p}, 'Tabular Q-learning'), tabularEqualsHybrid(s) = isequal(m.cumDelivered, hyb.cumDelivered) && isequal(m.energy, hyb.energy); end
             fprintf('seed %d %-19s delivered %4d  operational r500 %2d  FNF %4g  residual %5.2f J  (%.1f s)\n', seed, names{p}, m.delivered, m.finalAlive, m.fnd, m.residual, prot(p).runtime(s));
         end
     end

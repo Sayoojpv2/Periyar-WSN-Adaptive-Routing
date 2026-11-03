@@ -1,5 +1,5 @@
-function m = extract_v2_metrics(res, env)
-% EXTRACT_V2_METRICS Per-round series and summary values from one protocol run.
+function m = extract_metrics(res, env)
+% EXTRACT_METRICS Per-round series and summary values from one protocol run.
 % Works for the RL-Hybrid/learner result format and the LEACH/DEEC/PEGASIS(-RL) format.
     N = env.numNodes; E0 = N * env.initialEnergy;
     % Report accounting per round (application reports, the unit every protocol carries):

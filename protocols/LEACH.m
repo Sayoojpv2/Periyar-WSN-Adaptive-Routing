@@ -1,38 +1,11 @@
-function res = RL_LEACH_v5_RP(wsn_env, ~, success_history, seed, app_workload, rl_mode, opts)
-% REPORT-PRESERVING COPY of RL_LEACH_v5.m: identical except that a frame carrying m station reports is charged as
+% protocols/LEACH.m
+function res = LEACH(wsn_env, lq_history, success_history, seed, app_workload)
+% Report-preserving energy accounting: a frame carrying m station reports is charged as
 % m packets (radio TX/RX energy for m x packetSize bits), as the per-report delivery metric requires.
-%RL_LEACH_V5 LEACH with an RL cluster-head candidacy gate (v5).
-% Parent: protocols/LEACH.m (unchanged). Everything is the parent's code except the CH election:
-%  * LEACH's threshold draw and epoch set G are unchanged and decide who is a CANDIDATE;
-%  * an RL gate (shared tabular Q, actions decline/serve) decides whether each candidate serves.
-%    A declining candidate stays in G, so LEACH's rotation pressure (threshold -> 1 late in the
-%    epoch) keeps offering it the role;
-%  * if no candidate serves, the CH is the operational node with the highest learned value of
-%    serving (opts.rlFallback) instead of LEACH's uniformly random fallback node.
-% Clustering (nearest CH), aggregation, the direct CH->BS frame and the death rule are LEACH's.
-% Why: in the 600 m line with the BS at one end, a CH 400-550 m from the BS spends 0.1-0.5 J per
-% BS frame at 20-45 % link success; LEACH's energy-blind rotation forces every node to do this once
-% per epoch. v3's RL only chose a member's CH, but ~1 CH is elected per round, so it had no choice.
-% State (36): BS-distance band (<d0, <2d0, <3d0, >=3d0) x E/E_avg band x operational nodes farther
-% from the BS (0-1, 2-4, >=5). Reward (team, per round, after the outcome): R = (D/A)(1 - e/(e+E_b)),
-% D delivered, A valid reports available, e = round energy / A, E_b = sustainable J per report.
-% Update: contextual bandit Q(s,a) += alpha (R - Q(s,a)) for every gate decision of the round.
-    if nargin < 6 || isempty(rl_mode); rl_mode = 'active'; end
-    if nargin < 7; opts = struct(); end
-    assert(any(strcmpi(rl_mode, {'active', 'noop'})), 'Unknown rl_mode %s', rl_mode);
-    rl_enabled = strcmpi(rl_mode, 'active');
+    if nargin < 5; app_workload = []; end
     use_app_workload = ~isempty(app_workload);
     rng(seed, 'twister'); % Use reproducible seed for protocol-specific probabilistic decisions
-    cfg = struct('variant', 'LEACH-RL v5', 'mode', rl_mode, 'alpha', 0.10, 'epsilonInitial', 0.20, 'epsilonDecayPerRound', 0.99, ...
-        'epsilonMinimum', 0.02, 'qInit', 0, 'rlFallback', true, 'useEnergyReward', true, 'rngSeed', 400000 + seed, ...
-        'energyBudgetJ', wsn_env.numNodes * wsn_env.initialEnergy / (numel(app_workload.sensing_nodes) * wsn_env.budgetHorizonRounds));
-    for f = fieldnames(opts)', cfg.(f{1}) = opts.(f{1}); end
-    rl_stream = RandStream('mt19937ar', 'Seed', cfg.rngSeed);   % RL draws never touch LEACH's own stream
-    rl_Q = cfg.qInit * ones(36, 2);                               % actions: 1 decline, 2 serve
-    rl_log = cell(1, wsn_env.numRounds);                          % [round node state action explored fallback reward QBefore]
-    rl_parent_ch = false(wsn_env.numNodes, wsn_env.numRounds); rl_ch = false(wsn_env.numNodes, wsn_env.numRounds);
-    m_epsilon = zeros(1, wsn_env.numRounds);
-
+    
     numNodes = wsn_env.numNodes;
     E_residual = ones(1, numNodes) * wsn_env.initialEnergy;
     is_alive = true(1, numNodes);
@@ -90,7 +63,8 @@ function res = RL_LEACH_v5_RP(wsn_env, ~, success_history, seed, app_workload, r
         if isnan(FND) && num_alive < numNodes; FND = r; end
         if isnan(HND) && num_alive <= numNodes/2; HND = r; end
         
-        % Fetch identical common environment realization (channel outcomes are read only after a frame is paid for)
+        % Fetch identical common environment realization
+        lq_matrix = lq_history(:,:,r);
         succ_matrix = success_history(:,:,r);
         
         % Workload determination & Lifecycle Accounting
@@ -168,48 +142,24 @@ function res = RL_LEACH_v5_RP(wsn_env, ~, success_history, seed, app_workload, r
         
         thresh = p / (1 - p * r_prime);
         is_CH = false(1, numNodes);
-        drawn = false(1, numNodes);                 % LEACH's own election = the candidates
         for i = 1:numNodes
             if is_alive(i) && G(i)
                 if rand() <= thresh
-                    drawn(i) = true;
+                    is_CH(i) = true;
+                    G(i) = false; % Node has been CH in this epoch, excluded until next epoch
                 end
             end
         end
-        alive_idx = find(is_alive);
-        parent_pick = 0;
-        if ~any(drawn) && ~isempty(alive_idx)
-            parent_pick = alive_idx(randi(length(alive_idx)));   % LEACH's fallback draw (same stream as LEACH)
-        end
-        rl_parent_ch(:, r) = drawn(:); if parent_pick > 0, rl_parent_ch(parent_pick, r) = true; end
-
-        epsilon = max(cfg.epsilonMinimum, cfg.epsilonInitial * cfg.epsilonDecayPerRound^(r-1)); m_epsilon(r) = epsilon;
-        if rl_enabled
-            rl_s = leachV5States(wsn_env, E_residual, is_alive);
-            for i = find(drawn)
-                explored = rand(rl_stream) < epsilon;
-                if explored, a = randi(rl_stream, 2); else, q = rl_Q(rl_s(i), :); best = find(q == max(q)); a = best(randi(rl_stream, numel(best))); end
-                if a == 2, is_CH(i) = true; G(i) = false; end
-                rl_log{r}(end+1,:) = [r, i, rl_s(i), a, double(explored), 0, NaN, rl_Q(rl_s(i), a)];
-            end
-        else
-            is_CH = drawn; G(drawn) = false;
-        end
-
+        
         % Implementation robustness fallback if 0 CHs elected (<0.5% probability)
-        if sum(is_CH) == 0 && ~isempty(alive_idx)
-            if rl_enabled && cfg.rlFallback
-                v = rl_Q(rl_s(alive_idx), 2); best = alive_idx(v == max(v)); chosen = best(randi(rl_stream, numel(best)));
-                rl_log{r}(end+1,:) = [r, chosen, rl_s(chosen), 2, 0, 1, NaN, rl_Q(rl_s(chosen), 2)];
-            elseif parent_pick > 0
-                chosen = parent_pick;
-            else
-                chosen = alive_idx(randi(rl_stream, numel(alive_idx)));   % every candidate declined: LEACH-style random node
+        if sum(is_CH) == 0
+            alive_idx = find(is_alive);
+            if ~isempty(alive_idx)
+                chosen = alive_idx(randi(length(alive_idx)));
+                is_CH(chosen) = true;
+                G(chosen) = false;
             end
-            is_CH(chosen) = true;
-            G(chosen) = false;
         end
-        rl_ch(:, r) = is_CH(:);
         m_chCount(r) = sum(is_CH);
         
         ch_idx = find(is_CH);
@@ -334,16 +284,7 @@ function res = RL_LEACH_v5_RP(wsn_env, ~, success_history, seed, app_workload, r
         assert(actual_expended >= 0 && abs((energy_start - energy_end) - actual_expended) <= 1e-10, ...
             'Physical energy accounting does not close');
         assert(energy_end <= energy_start + 1e-12, 'Total physical residual energy cannot increase');
-        if rl_enabled && ~isempty(rl_log{r})
-            % Team reward of the round, credited to every gate decision taken in it.
-            R_round = rlRoundReward(del_this_round, source_avail_this_round, actual_expended, cfg);
-            for q = 1:size(rl_log{r}, 1)
-                s = rl_log{r}(q, 3); a = rl_log{r}(q, 4);
-                rl_Q(s, a) = rl_Q(s, a) + cfg.alpha * (R_round - rl_Q(s, a));
-                rl_log{r}(q, 7) = R_round;
-            end
-        end
-
+        
         m_alive(r) = sum(is_alive);
         m_totalEnergy(r) = energy_end;
         m_operational_energy(r) = sum(E_residual(is_alive));
@@ -432,25 +373,4 @@ function res = RL_LEACH_v5_RP(wsn_env, ~, success_history, seed, app_workload, r
     res.finalNodeEnergies = E_residual;
     res.minResidualEnergy = min(E_residual);
     res.maxResidualEnergy = max(E_residual);
-    res.rlConfig = cfg; res.rlQ = rl_Q; res.epsilonHistory = m_epsilon;
-    res.rlDecisionLog = vertcat(rl_log{:});
-    res.rlDecisionLogColumns = {'round', 'node', 'state', 'action(1 decline, 2 serve)', 'explored', 'fallback', 'reward', 'QBefore'};
-    res.rlCHHistory = rl_ch; res.rlParentCHHistory = rl_parent_ch;   % CH set used / LEACH's own election with the same draws
-end
-
-function s = leachV5States(env, E, alive)
-% Decision-time state of every node: BS-distance band, E/E_avg band, operational nodes farther from the BS.
-    dbs = hypot(env.X - env.BS_X, env.Y - env.BS_Y); ratio = E / max(1e-12, mean(E(alive)));
-    f1 = 1 + (dbs >= env.d0) + (dbs >= 2 * env.d0) + (dbs >= 3 * env.d0);
-    f2 = 1 + (ratio >= 0.8) + (ratio > 1.2);
-    up = arrayfun(@(i) nnz(alive & dbs > dbs(i)), 1:env.numNodes); f3 = 1 + (up >= 2) + (up >= 5);
-    s = f1 + 4 * (f2 - 1) + 12 * (f3 - 1);
-end
-
-function R = rlRoundReward(delivered, available, energyJ, cfg)
-% Valid-report delivery of the round discounted by its energy per available report relative to the
-% sustainable budget E_b (R in [0, 1]); without the energy term R = delivered / available.
-    if available == 0, R = 0; return; end
-    e = energyJ / available; R = delivered / available;
-    if cfg.useEnergyReward, R = R * (1 - e / (e + cfg.energyBudgetJ)); end
 end

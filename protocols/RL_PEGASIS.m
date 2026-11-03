@@ -1,17 +1,17 @@
-function res = RL_PEGASIS_v5_EA(wsn_env, ~, success_history, seed, app_workload, rl_mode, opts, ea)
-% ENERGY-AUDIT COPY of RL_PEGASIS_v5.m: identical behaviour unless ea.chargeFailedRx or
+function res = RL_PEGASIS(wsn_env, ~, success_history, seed, app_workload, rl_mode, opts, ea)
+% Energy-audit options: behaviour is the plain protocol's unless ea.chargeFailedRx or
 % ea.singleLeaderAggregation is true (see eaDefaults); adds a per-node energy ledger (res.energyLedger).
-%RL_PEGASIS_V5 PEGASIS with RL leader selection without forced rotation (v5).
+%RL_PEGASIS PEGASIS with RL leader selection without forced rotation.
 % Parent: protocols/PEGASIS.m (unchanged). Everything is the parent's code except the leader:
 %   PEGASIS: leader = chain(mod(r-1, chain length) + 1), i.e. every node leads once per cycle;
-%   v5:      epsilon-greedy over the learned value V(s) of the live chain nodes (shared table, 36
+%   RL-PEGASIS: epsilon-greedy over the learned value V(s) of the live chain nodes (shared table, 36
 %            states: BS-distance band x E/E_avg band x longer-branch length 1-2, 3-5, >=6 hops).
 %            opts.energyGuard g > 0 restricts the choice to nodes with E >= g E_avg when any exist.
 % Greedy chain construction, token passing with fusion at every hop, the single leader->BS frame and
 % the death rule are PEGASIS's.
 % Why: the leader->BS frame is 87-92 % of PEGASIS's energy; a leader 400-550 m from the BS pays
-% 0.1-0.5 J per frame at 20-45 % link success. v3 also had to let every node lead once per cycle, so
-% its RL only reordered leaders (mean leader BS distance identical to PEGASIS) and its TD values,
+% 0.1-0.5 J per frame at 20-45 % link success. An RL that must still let every node lead once per
+% cycle only reorders leaders (mean leader BS distance identical to PEGASIS) and its TD values,
 % bootstrapped with gamma = 0.9 over aliased states, grew instead of converging.
 % Reward (team, per round, after the outcome): R = (D/A)(1 - e/(e+E_b)); the leader's state value
 % updates V(s) += alpha (R - V(s)) (contextual bandit, optimistic initial value).
@@ -19,7 +19,7 @@ function res = RL_PEGASIS_v5_EA(wsn_env, ~, success_history, seed, app_workload,
     if nargin < 7; opts = struct(); end
     assert(any(strcmpi(rl_mode, {'active', 'noop'})), 'Unknown rl_mode %s', rl_mode);
     rl_enabled = strcmpi(rl_mode, 'active');
-    cfg = struct('variant', 'PEGASIS-RL v5', 'mode', rl_mode, 'alpha', 0.10, 'epsilonInitial', 0.20, 'epsilonDecayPerRound', 0.99, ...
+    cfg = struct('variant', 'RL-PEGASIS', 'mode', rl_mode, 'alpha', 0.10, 'epsilonInitial', 0.20, 'epsilonDecayPerRound', 0.99, ...
         'epsilonMinimum', 0.02, 'vInit', 0.6, 'energyGuard', 0, 'useEnergyReward', true, 'rngSeed', 500000 + seed, ...
         'energyBudgetJ', wsn_env.numNodes * wsn_env.initialEnergy / (numel(app_workload.sensing_nodes) * wsn_env.budgetHorizonRounds));
     for f = fieldnames(opts)', cfg.(f{1}) = opts.(f{1}); end
@@ -168,7 +168,7 @@ function res = RL_PEGASIS_v5_EA(wsn_env, ~, success_history, seed, app_workload,
             if cfg.energyGuard > 0
                 ok = E_residual(chain) >= cfg.energyGuard * mean(E_residual(chain)); if any(ok), cands = chain(ok); end
             end
-            cs = pegasisV5States(chain, cands, wsn_env, E_residual); v = rl_V(cs)';
+            cs = pegasisStates(chain, cands, wsn_env, E_residual); v = rl_V(cs)';
             explored = rand(rl_stream) < epsilon;
             if explored, k = randi(rl_stream, numel(cands)); else, best = find(v == max(v)); k = best(randi(rl_stream, numel(best))); end
             leader = cands(k); leader_idx_in_chain = find(chain == leader, 1);
@@ -363,7 +363,7 @@ function res = RL_PEGASIS_v5_EA(wsn_env, ~, success_history, seed, app_workload,
     res.rlDecisionLogColumns = {'round', 'leader', 'state', 'explored', 'nCandidates', 'parentLeader', 'reward', 'VBefore'};
 end
 
-function s = pegasisV5States(chain, cands, env, E)
+function s = pegasisStates(chain, cands, env, E)
 % Decision-time state of each candidate: BS-distance band, E/E_avg band (chain nodes), longer-branch hops.
     L = numel(chain); s = zeros(size(cands)); Eavg = max(1e-12, mean(E(chain)));
     for q = 1:numel(cands)

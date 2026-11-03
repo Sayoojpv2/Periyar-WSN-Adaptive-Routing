@@ -16,7 +16,7 @@ its redistribution has been established.
 
 1. Obtain the report workbook from KSPCB (Environmental Surveillance Centre, Eloor, or the KSPCB
    office/website) or from the project author.
-2. Save it as `data/consdata.xlsx` inside this project folder. The path is set in `v2_config.m`
+2. Save it as `data/consdata.xlsx` inside this project folder. The path is set in `wsn_config.m`
    (`cfg.workbook`); no other location is used.
 3. Check that it is the same file (MATLAB):
 

@@ -1,5 +1,5 @@
-function res = RL_Hybrid_RP(wsn_env, ~, success_history, seed, app_workload)
-% REPORT-PRESERVING COPY of RL_Hybrid.m: identical except that a frame carrying m station reports is charged as
+function res = RL_Hybrid(wsn_env, ~, success_history, seed, app_workload)
+% Report-preserving energy accounting: a frame carrying m station reports is charged as
 % m packets (radio TX/RX energy for m x packetSize bits), as the per-report delivery metric requires.
 %RL_HYBRID Online tabular Q-learning for cluster assignment and multi-hop routing.
 % Causal information rule: before an action is chosen the agent may use only
@@ -13,7 +13,7 @@ function res = RL_Hybrid_RP(wsn_env, ~, success_history, seed, app_workload)
 %
 % Death rule (same semantics as LEACH/DEEC/PEGASIS): a node becomes
 % unavailable when it must perform an operation it cannot afford. Additionally
-% a node holding less energy than the cheapest radio operation of the frozen
+% a node holding less energy than the cheapest radio operation of the
 % energy model (E_elec*packetSize = one packet reception) is unavailable at
 % the end of the round, because it can no longer perform any radio operation.
 
@@ -486,7 +486,7 @@ function res = RL_Hybrid_RP(wsn_env, ~, success_history, seed, app_workload)
             'Physical battery-energy conservation failed in RL-Hybrid.');
         assert(energyEnd<=energyStart+1e-12);
         % A node that cannot afford even the cheapest radio operation of the
-        % frozen energy model (one packet reception, E_elec*k) can take part in
+        % energy model (one packet reception, E_elec*k) can take part in
         % no protocol function and is unavailable from the next round on.
         for i=find(alive & (E < cfg.minRadioOperationEnergyJ))
             alive(i)=false;

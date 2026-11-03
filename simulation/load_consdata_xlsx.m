@@ -5,7 +5,7 @@ function [wq_data, info] = load_consdata_xlsx(xlsxPath)
 % create_periyar_workload_continuous: Location, Date, Temperature, pH,
 % Conductivity, TDS, DO (full-precision workbook values, NaN where not numeric).
 %
-% Record rules (they reproduce the V1 record set: 1273 records, 10 stations):
+% Record rules (they give 1273 records from 10 stations):
 %   - station name = text after "Sampling point:" on the sheet;
 %   - date header dd.mm.yy or dd.mm.yyyy; only dates 01-Jan-2025 .. 31-Jul-2025 are kept
 %     (headers with mistyped years, e.g. 31.05.2026 or 18.05.20285, are excluded and logged);
@@ -13,7 +13,7 @@ function [wq_data, info] = load_consdata_xlsx(xlsxPath)
 %   - a date repeated within a station (second table on the VETTUKADAVU sheet) keeps its
 %     first occurrence; repeats are logged.
     if nargin < 1 || isempty(xlsxPath)
-        cfg = v2_config(); xlsxPath = cfg.workbook;
+        cfg = wsn_config(); xlsxPath = cfg.workbook;
     end
     assert(isfile(xlsxPath), 'Workbook not found: %s', xlsxPath);
     labels = {'Temperature', 'pH', 'Conductivity', 'TDS', 'D.O.'};

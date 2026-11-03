@@ -1,6 +1,6 @@
 % protocols/PEGASIS.m
-function res = PEGASIS_EA(wsn_env, lq_history, success_history, seed, app_workload, ea)
-% ENERGY-AUDIT COPY of PEGASIS.m: identical behaviour unless ea.chargeFailedRx or
+function res = PEGASIS(wsn_env, lq_history, success_history, seed, app_workload, ea)
+% Energy-audit options: behaviour is the plain protocol's unless ea.chargeFailedRx or
 % ea.singleLeaderAggregation is true (see eaDefaults); adds a per-node energy ledger (res.energyLedger).
     if nargin < 5; app_workload = []; end
     use_app_workload = ~isempty(app_workload);

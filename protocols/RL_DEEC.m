@@ -1,18 +1,18 @@
-function results = RL_DEEC_v5_RP(wsn_env, ~, success_history, seed, app_workload, rl_mode, opts)
-% REPORT-PRESERVING COPY of RL_DEEC_v5.m: identical except that a frame carrying m station reports is charged as
+function results = RL_DEEC(wsn_env, ~, success_history, seed, app_workload, rl_mode, opts)
+% Report-preserving energy accounting: a frame carrying m station reports is charged as
 % m packets (radio TX/RX energy for m x packetSize bits), as the per-report delivery metric requires.
-%RL_DEEC_V5 DEEC with an RL communication-cost correction of the CH probability (v5).
+%RL_DEEC DEEC with an RL communication-cost correction of the CH probability.
 % Parent: protocols/DEEC.m (unchanged). Everything is the parent's code except p_i:
 %   DEEC:  p_i = p E_i / E_avg
-%   v5:    p_i = p (E_i / E_avg) w_i,  w_i = c exp(beta (V(s_i) - mean V over operational nodes)),
-%          c chosen so that sum_i p_i equals DEEC's sum (same expected number of CHs).
+%   RL-DEEC: p_i = p (E_i / E_avg) w_i,  w_i = c exp(beta (V(s_i) - mean V over operational nodes)),
+%            c chosen so that sum_i p_i equals DEEC's sum (same expected number of CHs).
 % DEEC's energy proportionality, threshold, epoch and eligibility set G are kept; the zero-CH
 % fallback takes the operational node with the largest p_i instead of a uniformly random node.
 % V(s) is the learned value of a round headed by a node in state s (shared table over 36 states:
 % BS-distance band x E/E_avg band x BS frames the node can afford: <10, 10-100, >100).
 % Why: DEEC weights only energy, so a node 400-550 m from the BS (0.1-0.5 J per BS frame, 20-45 %
-% success) is as likely to lead as one next to the BS. v4 replaced DEEC's draw by an RL choice of the
-% CH identity (initially random among ties), which ignored E_i / E_avg and picked below-average-
+% success) is as likely to lead as one next to the BS. Replacing DEEC's draw by an RL choice of the CH
+% identity (an earlier design, initially random among ties) ignored E_i / E_avg and picked below-average-
 % energy CHs (E/E_avg 0.74-0.87 in two development seeds), shortening lifetime.
 % Reward (team, per round, after the outcome): R = (D/A)(1 - e/(e+E_b)); every CH of the round
 % updates V(s) += alpha (R - V(s)). Exploration is the stochastic election itself (no epsilon).
@@ -22,7 +22,7 @@ function results = RL_DEEC_v5_RP(wsn_env, ~, success_history, seed, app_workload
     rl_enabled = strcmpi(rl_mode, 'active');
     use_app_workload = ~isempty(app_workload);
     rng(seed, 'twister');
-    cfg = struct('variant', 'DEEC-RL v5', 'mode', rl_mode, 'alpha', 0.10, 'beta', 8, 'vInit', 0.25, 'useEnergyReward', true, ...
+    cfg = struct('variant', 'RL-DEEC', 'mode', rl_mode, 'alpha', 0.10, 'beta', 8, 'vInit', 0.25, 'useEnergyReward', true, ...
         'energyBudgetJ', wsn_env.numNodes * wsn_env.initialEnergy / (numel(app_workload.sensing_nodes) * wsn_env.budgetHorizonRounds));
     for f = fieldnames(opts)', cfg.(f{1}) = opts.(f{1}); end
     rl_V = cfg.vInit * ones(36, 1);
@@ -169,7 +169,7 @@ function results = RL_DEEC_v5_RP(wsn_env, ~, success_history, seed, app_workload
         % RL cost correction w_i (w = 1 in noop mode): same expected CH count as DEEC.
         w = ones(1, numNodes);
         if rl_enabled
-            rl_s = deecV5States(wsn_env, E_residual, is_alive);
+            rl_s = deecStates(wsn_env, E_residual, is_alive);
             Vs = rl_V(rl_s)'; Va = Vs(is_alive);
             w = exp(cfg.beta * (Vs - mean(Va)));
             w = w * sum(E_residual(is_alive)) / sum(E_residual(is_alive) .* w(is_alive));
@@ -442,7 +442,7 @@ function results = RL_DEEC_v5_RP(wsn_env, ~, success_history, seed, app_workload
     results.rlUpdateLogColumns = {'round', 'node', 'state', 'reward', 'VBefore'};
 end
 
-function s = deecV5States(env, E, alive)
+function s = deecStates(env, E, alive)
 % Decision-time state of every node: BS-distance band, E/E_avg band, BS frames its energy can pay for.
     dbs = hypot(env.X - env.BS_X, env.Y - env.BS_Y); ratio = E / max(1e-12, mean(E(alive)));
     f1 = 1 + (dbs >= env.d0) + (dbs >= 2 * env.d0) + (dbs >= 3 * env.d0);

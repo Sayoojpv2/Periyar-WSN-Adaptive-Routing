@@ -1,8 +1,8 @@
-function res = RL_Hybrid_LearnerComparison_RP(wsn_env, ~, success_history, seed, app_workload, learner)
-% REPORT-PRESERVING COPY of RL_Hybrid_LearnerComparison.m: identical except that a frame carrying m station reports is charged as
+function res = RL_Hybrid_LearnerComparison(wsn_env, ~, success_history, seed, app_workload, learner)
+% Report-preserving energy accounting: a frame carrying m station reports is charged as
 % m packets (radio TX/RX energy for m x packetSize bits), as the per-report delivery metric requires.
-%RL_HYBRID_LEARNERCOMPARISON RL-Hybrid with a selectable learning method (research/RL_HYBRID_LEARNING_COMPARISON_PROTOCOL.md).
-% Copy of the frozen protocols/RL_Hybrid.m. Only the action-value lookup used by action selection and the
+%RL_HYBRID_LEARNERCOMPARISON RL-Hybrid with a selectable learning method.
+% Built on protocols/RL_Hybrid.m. Only the action-value lookup used by action selection and the
 % Q-update call sites are routed through learner functions; environment, candidates, constraints, reward,
 % lifecycle and accounting are unchanged. learner: 'tabularQ' (reproduces RL_Hybrid exactly), 'doubleQ',
 % 'doubleDQN', 'duelingDoubleDQN'. RL_Hybrid_LearnerComparison('selftest') runs the learner unit tests.
@@ -21,7 +21,7 @@ function res = RL_Hybrid_LearnerComparison_RP(wsn_env, ~, success_history, seed,
 %
 % Death rule (same semantics as LEACH/DEEC/PEGASIS): a node becomes
 % unavailable when it must perform an operation it cannot afford. Additionally
-% a node holding less energy than the cheapest radio operation of the frozen
+% a node holding less energy than the cheapest radio operation of the
 % energy model (E_elec*packetSize = one packet reception) is unavailable at
 % the end of the round, because it can no longer perform any radio operation.
 
@@ -508,7 +508,7 @@ function res = RL_Hybrid_LearnerComparison_RP(wsn_env, ~, success_history, seed,
             'Physical battery-energy conservation failed in RL-Hybrid.');
         assert(energyEnd<=energyStart+1e-12);
         % A node that cannot afford even the cheapest radio operation of the
-        % frozen energy model (one packet reception, E_elec*k) can take part in
+        % energy model (one packet reception, E_elec*k) can take part in
         % no protocol function and is unavailable from the next round on.
         for i=find(alive & (E < cfg.minRadioOperationEnergyJ))
             alive(i)=false;
@@ -613,7 +613,7 @@ function res = RL_Hybrid_LearnerComparison_RP(wsn_env, ~, success_history, seed,
     res.wsn_env=wsn_env;
 
     function [action,state,explored,x]=selectActionL(states,candidates,epsilon,actingNode)
-        % Same draws and tie-break as the frozen selectAction; only the value lookup is learner-specific.
+        % Same draws and tie-break as RL_Hybrid's selectAction; only the value lookup is learner-specific.
         if isempty(candidates), error('RL action set unexpectedly empty.'); end
         x=[]; if isDQN, x=encodeInput(states,candidates,actingNode,n); end
         explored=rand()<epsilon;
@@ -977,6 +977,6 @@ function T=learnerSelfTest()
 end
 
 function A=numActionsOf(net)
-% number of action slots (n+1); 51 at V1 size
+% number of action slots (n+1); 51 for a 50-node network
     if isfield(net,'ba'), A=numel(net.ba); else, A=numel(net.bo); end
 end

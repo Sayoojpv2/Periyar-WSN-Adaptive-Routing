@@ -1,10 +1,10 @@
-% protocols/LEACH.m
-function res = LEACH_RP(wsn_env, lq_history, success_history, seed, app_workload)
-% REPORT-PRESERVING COPY of LEACH.m: identical except that a frame carrying m station reports is charged as
+% protocols/DEEC.m
+function results = DEEC(wsn_env, lq_history, success_history, seed, app_workload)
+% Report-preserving energy accounting: a frame carrying m station reports is charged as
 % m packets (radio TX/RX energy for m x packetSize bits), as the per-report delivery metric requires.
     if nargin < 5; app_workload = []; end
     use_app_workload = ~isempty(app_workload);
-    rng(seed, 'twister'); % Use reproducible seed for protocol-specific probabilistic decisions
+    rng(seed, 'twister');
     
     numNodes = wsn_env.numNodes;
     E_residual = ones(1, numNodes) * wsn_env.initialEnergy;
@@ -33,9 +33,9 @@ function res = LEACH_RP(wsn_env, lq_history, success_history, seed, app_workload
     m_externalFailureEnergy = zeros(1, ar);
     m_energyStdDev = zeros(1, ar);
     
-    p = 0.1; 
+    p = 0.1;
     epoch_len = round(1/p);
-    G = true(1, numNodes); 
+    G = true(1, numNodes);
     m_chCount = zeros(1, ar);
     
     R_bit = 250e3; T_proc = 0.005; c = 3e8;
@@ -130,7 +130,7 @@ function res = LEACH_RP(wsn_env, lq_history, success_history, seed, app_workload
             continue;
         end
         
-        % Canonical LEACH CH Election (Heinzelman et al. 2002)
+        % Canonical DEEC CH Election (Qing et al. 2006)
         r_prime = mod(r - 1, epoch_len);
         if r_prime == 0
             % Epoch reset: all surviving nodes re-enter eligibility set G
@@ -140,10 +140,22 @@ function res = LEACH_RP(wsn_env, lq_history, success_history, seed, app_workload
             G = G & is_alive;
         end
         
-        thresh = p / (1 - p * r_prime);
+        E_avg = max(1e-6, sum(E_residual(is_alive)) / num_alive);
         is_CH = false(1, numNodes);
+        
         for i = 1:numNodes
             if is_alive(i) && G(i)
+                % Dynamic DEEC probability proportional to residual energy
+                p_i = p * (E_residual(i) / E_avg);
+                
+                % Robust threshold calculation preventing negative denominator
+                denom = 1 - p_i * r_prime;
+                if denom > 1e-4
+                    thresh = min(1.0, p_i / denom);
+                else
+                    thresh = 1.0;
+                end
+                
                 if rand() <= thresh
                     is_CH(i) = true;
                     G(i) = false; % Node has been CH in this epoch, excluded until next epoch
@@ -151,7 +163,7 @@ function res = LEACH_RP(wsn_env, lq_history, success_history, seed, app_workload
             end
         end
         
-        % Implementation robustness fallback if 0 CHs elected (<0.5% probability)
+        % Implementation robustness fallback if 0 CHs elected
         if sum(is_CH) == 0
             alive_idx = find(is_alive);
             if ~isempty(alive_idx)
@@ -222,6 +234,7 @@ function res = LEACH_RP(wsn_env, lq_history, success_history, seed, app_workload
         
         % CH Phase
         del_this_round = 0; delay_sum_this_round = 0;
+        
         for i = 1:numNodes
             if is_alive(i) && is_CH(i)
                 reports_carried = node_reports(i);
@@ -230,7 +243,6 @@ function res = LEACH_RP(wsn_env, lq_history, success_history, seed, app_workload
                     if E_residual(i) >= E_agg
                         E_residual(i) = E_residual(i) - E_agg;
                         agg_e_round = agg_e_round + E_agg;
-                        
                         d_bs = sqrt((wsn_env.X(i)-wsn_env.BS_X)^2 + (wsn_env.Y(i)-wsn_env.BS_Y)^2);
                         E_tx = tx_energy(wsn_env.packetSize * reports_carried, d_bs, wsn_env);   % RP: m reports = m packets
                         if E_residual(i) >= E_tx
@@ -289,7 +301,7 @@ function res = LEACH_RP(wsn_env, lq_history, success_history, seed, app_workload
         m_totalEnergy(r) = energy_end;
         m_operational_energy(r) = sum(E_residual(is_alive));
         if isnan(FND) && m_alive(r) < numNodes; FND = r; end
-        if isnan(HND) && m_alive(r) <= numNodes/2; HND = r; end 
+        if isnan(HND) && m_alive(r) <= numNodes/2; HND = r; end
         if del_this_round > 0
             m_delay(r) = delay_sum_this_round / del_this_round;
         else
@@ -306,71 +318,71 @@ function res = LEACH_RP(wsn_env, lq_history, success_history, seed, app_workload
         end
     end
     
-    res = struct();
-    res.configuredRounds = wsn_env.numRounds;
-    res.actualRoundsSimulated = find(~isnan(m_alive), 1, 'last');
-    if isempty(res.actualRoundsSimulated); res.actualRoundsSimulated = ar; end
-    res.wsn_env = wsn_env;
-    res.aliveNodes = m_alive;
-    res.totalResidualEnergy = m_totalEnergy;
-    res.operationalResidualEnergy = m_operational_energy;
-    res.E_residual_history = E_residual_history;
-    res.is_alive_history = is_alive_history;
-    res.sensingNodes = sensing_nodes;
-    res.sensingSourceAvailableHistory = sensing_source_available_history;
+    results = struct();
+    results.configuredRounds = wsn_env.numRounds;
+    results.actualRoundsSimulated = find(~isnan(m_alive), 1, 'last');
+    if isempty(results.actualRoundsSimulated); results.actualRoundsSimulated = ar; end
+    results.wsn_env = wsn_env;
+    results.aliveNodes = m_alive;
+    results.totalResidualEnergy = m_totalEnergy;
+    results.operationalResidualEnergy = m_operational_energy;
+    results.E_residual_history = E_residual_history;
+    results.is_alive_history = is_alive_history;
+    results.sensingNodes = sensing_nodes;
+    results.sensingSourceAvailableHistory = sensing_source_available_history;
     
     % Explicit Report Lifecycle Counters
-    res.scheduledReports = m_scheduled;
-    res.sourceAvailableReports = m_source_avail;
-    res.sourceUnavailableReports = m_source_unavail;
-    res.transmittedReports = m_transmitted;
-    res.deliveredReports = m_del;
-    res.lostInTransitReports = m_lost;
-    res.availableButUnattemptedReports = m_unattempted;
-    res.actualTxPacketAttempts = m_tx_packets;
-    res.txEnergyExpended = m_tx_energy; res.rxEnergyExpended = m_rx_energy; res.aggregationEnergyExpended = m_agg_energy;
-    res.actualEnergyExpendedThisRound = m_routingEnergy;
+    results.scheduledReports = m_scheduled;
+    results.sourceAvailableReports = m_source_avail;
+    results.sourceUnavailableReports = m_source_unavail;
+    results.transmittedReports = m_transmitted;
+    results.deliveredReports = m_del;
+    results.lostInTransitReports = m_lost;
+    results.availableButUnattemptedReports = m_unattempted;
+    results.actualTxPacketAttempts = m_tx_packets;
+    results.txEnergyExpended = m_tx_energy; results.rxEnergyExpended = m_rx_energy; results.aggregationEnergyExpended = m_agg_energy;
+    results.actualEnergyExpendedThisRound = m_routingEnergy;
     
-    res.totalScheduledReports = sum(m_scheduled(~isnan(m_scheduled)));
-    res.totalSourceAvailableReports = sum(m_source_avail(~isnan(m_source_avail)));
-    res.totalSourceUnavailableReports = sum(m_source_unavail(~isnan(m_source_unavail)));
-    res.totalTransmittedReports = sum(m_transmitted(~isnan(m_transmitted)));
-    res.totalDeliveredReports = sum(m_del(~isnan(m_del)));
-    res.totalLostInTransitReports = sum(m_lost(~isnan(m_lost)));
+    results.totalScheduledReports = sum(m_scheduled(~isnan(m_scheduled)));
+    results.totalSourceAvailableReports = sum(m_source_avail(~isnan(m_source_avail)));
+    results.totalSourceUnavailableReports = sum(m_source_unavail(~isnan(m_source_unavail)));
+    results.totalTransmittedReports = sum(m_transmitted(~isnan(m_transmitted)));
+    results.totalDeliveredReports = sum(m_del(~isnan(m_del)));
+    results.totalLostInTransitReports = sum(m_lost(~isnan(m_lost)));
     
     % Metric Definitions (Prompt Section 13)
     % A. Scheduled PDR: delivered / scheduled
-    res.scheduledPDR = (res.totalDeliveredReports / max(1, res.totalScheduledReports)) * 100;
+    results.scheduledPDR = (results.totalDeliveredReports / max(1, results.totalScheduledReports)) * 100;
     % B. Source-available delivery ratio: delivered / source_available
-    res.sourceAvailableDeliveryRatio = (res.totalDeliveredReports / max(1, res.totalSourceAvailableReports)) * 100;
+    results.sourceAvailableDeliveryRatio = (results.totalDeliveredReports / max(1, results.totalSourceAvailableReports)) * 100;
     % C. Transmission success ratio: delivered / transmitted
-    res.transmissionSuccessRatio = (res.totalDeliveredReports / max(1, res.totalTransmittedReports)) * 100;
+    results.transmissionSuccessRatio = (results.totalDeliveredReports / max(1, results.totalTransmittedReports)) * 100;
     
     % Backward compatibility mappings
-    res.generatedSourceReports = m_source_avail;
-    res.deliveredSourceReports = m_del;
+    results.generatedSourceReports = m_source_avail;
+    results.deliveredSourceReports = m_del;
     m_pdr = m_del ./ max(1, m_source_avail);
     m_pdr(isnan(m_alive)) = NaN;
-    res.sourceReportPDR = m_pdr;
-    res.totalGeneratedReports = res.totalSourceAvailableReports;
-    res.applicationPDR = res.scheduledPDR;
+    results.sourceReportPDR = m_pdr;
+    results.totalGeneratedReports = results.totalSourceAvailableReports;
+    results.applicationPDR = results.scheduledPDR;
     
-    res.averageEndToEndDelay = m_delay;
-    res.routingEnergyConsumedThisRound = m_routingEnergy;
-    res.externalFailureEnergy = m_externalFailureEnergy;
-    res.energyStdDev = m_energyStdDev;
-    res.chCountHistory = m_chCount;
+    results.averageEndToEndDelay = m_delay;
+    results.routingEnergyConsumedThisRound = m_routingEnergy;
+    results.externalFailureEnergy = m_externalFailureEnergy;
+    results.energyStdDev = m_energyStdDev;
+    results.chCountHistory = m_chCount;
     valid_ch = m_chCount(~isnan(m_chCount));
     if ~isempty(valid_ch)
-        res.meanCHCount = mean(valid_ch);
-        res.stdCHCount = std(valid_ch);
-        res.minCHCount = min(valid_ch);
-        res.maxCHCount = max(valid_ch);
+        results.meanCHCount = mean(valid_ch);
+        results.stdCHCount = std(valid_ch);
+        results.minCHCount = min(valid_ch);
+        results.maxCHCount = max(valid_ch);
     else
-        res.meanCHCount = NaN; res.stdCHCount = NaN; res.minCHCount = NaN; res.maxCHCount = NaN;
+        results.meanCHCount = NaN; results.stdCHCount = NaN; results.minCHCount = NaN; results.maxCHCount = NaN;
     end
-    res.FND = FND; res.HND = HND; res.LND = LND;
-    res.finalNodeEnergies = E_residual;
-    res.minResidualEnergy = min(E_residual);
-    res.maxResidualEnergy = max(E_residual);
+    results.FND = FND; results.HND = HND; results.LND = LND;
+    results.finalNodeEnergies = E_residual;
+    results.minResidualEnergy = min(E_residual);
+    results.maxResidualEnergy = max(E_residual);
 end

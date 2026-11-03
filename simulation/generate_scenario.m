@@ -1,9 +1,8 @@
-function [wsn_env, lq_history, success_history] = generate_scenario_v2(seed, cfg, mode)
-% GENERATE_SCENARIO_V2 V1's generate_scenario with the node set as an input.
-% Field, base station, radio parameters and the channel law/stream are V1's.
-%   mode 'v1Layout'           : V1 exactly (50 seeded random nodes) - used for regression checks
-%   mode 'v1StationPositions' : the 10 station nodes of V1's seeded layout, relays removed
-%   mode 'custom'             : cfg.customX / cfg.customY (metres)
+function [wsn_env, lq_history, success_history] = generate_scenario(seed, cfg, mode)
+% GENERATE_SCENARIO Field, base station, node positions, radio parameters and channel for one seed.
+%   mode 'referenceLayout'  : the full seeded 50-node reference layout - used for regression checks
+%   mode 'stationPositions' : the 10 station nodes of the seeded reference layout (default)
+%   mode 'custom'           : cfg.customX / cfg.customY (metres)
     if nargin < 3 || isempty(mode), mode = cfg.topology; end
     rng(seed, 'twister');
 
@@ -12,22 +11,22 @@ function [wsn_env, lq_history, success_history] = generate_scenario_v2(seed, cfg
     wsn_env.BS_X = wsn_env.riverLength;
     wsn_env.BS_Y = wsn_env.riverWidth / 2;
 
-    % V1 draws (same order and count as V1 generate_scenario)
+    % Reference-layout draws (fixed order and count, so the station positions do not depend on the mode)
     X = rand(1, 50) * wsn_env.riverLength;
     Y = rand(1, 50) * wsn_env.riverWidth;
     [X, sort_idx] = sort(X);
     Y = Y(sort_idx);
     switch mode
-        case 'v1Layout'
-            wsn_env.topologyNote = 'V1 seeded random layout, 50 nodes';
-        case 'v1StationPositions'
-            X = X(cfg.v1StationNodeIds); Y = Y(cfg.v1StationNodeIds);
-            wsn_env.topologyNote = ['SIMULATION ASSUMPTION: positions of V1 station nodes 4,8,...,48 ' ...
+        case 'referenceLayout'
+            wsn_env.topologyNote = 'seeded random reference layout, 50 nodes';
+        case 'stationPositions'
+            X = X(cfg.stationNodeIds); Y = Y(cfg.stationNodeIds);
+            wsn_env.topologyNote = ['SIMULATION ASSUMPTION: positions of reference-layout nodes 4,8,...,48 ' ...
                 'in the seeded 600 m x 50 m layout; relays removed; not geographic coordinates'];
         case 'custom'
             X = cfg.customX(:)'; Y = cfg.customY(:)';
             assert(numel(X) == cfg.numNodes && numel(Y) == cfg.numNodes, 'custom positions must have numNodes entries');
-            wsn_env.topologyNote = 'custom positions from v2_config';
+            wsn_env.topologyNote = 'custom positions from wsn_config';
         otherwise
             error('Unknown topology mode %s', mode);
     end
@@ -38,7 +37,7 @@ function [wsn_env, lq_history, success_history] = generate_scenario_v2(seed, cfg
 
     wsn_env.initialEnergy = 2.0; % 2.0 Joules
     wsn_env.packetSize = 4000; % bits
-    wsn_env.numRounds = cfg.numRounds;  % simulation horizon (1000 in v2_config; run_v2 opts.numRounds may override)
+    wsn_env.numRounds = cfg.numRounds;  % simulation horizon (1000 in wsn_config; run_experiment sets 500)
     wsn_env.budgetHorizonRounds = cfg.budgetHorizonRounds;  % RL energy-planning horizon, fixed (not tied to the run length)
 
     wsn_env.E_elec = 50e-9;

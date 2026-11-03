@@ -20,11 +20,11 @@ methods inside RL-Hybrid.
 | Conventional | **LEACH** | Random rotating cluster heads (CHs); members join the nearest CH; each CH aggregates and sends directly to the base station (BS). |
 | | **DEEC** | LEACH-style clustering with the CH probability weighted by a node's residual energy relative to the network average. |
 | | **PEGASIS** | A greedy chain of all nodes; reports are passed along the chain to one leader, which sends to the BS; the leader rotates every round. |
-| RL extensions (v5) | **LEACH-RL v5** | LEACH's election proposes CH candidates; a learned gate (Q-table over BS distance, relative energy and nodes still upstream) decides whether each candidate serves, and picks the best-valued node if none does. |
-| | **DEEC-RL v5** | DEEC's energy-weighted probability multiplied by a learned communication-cost correction (state value of serving, weight beta = 16), normalised so the expected number of CHs stays DEEC's. |
-| | **PEGASIS-RL v5** | The PEGASIS chain is unchanged; the leader is chosen by a learned value (BS distance, relative energy, chain-branch length) instead of fixed rotation, with an energy guard (only nodes with at least 0.5 x mean energy may lead). |
+| RL extensions | **RL-LEACH** | LEACH's election proposes CH candidates; a learned gate (Q-table over BS distance, relative energy and nodes still upstream) decides whether each candidate serves, and picks the best-valued node if none does. |
+| | **RL-DEEC** | DEEC's energy-weighted probability multiplied by a learned communication-cost correction (state value of serving, weight beta = 16), normalised so the expected number of CHs stays DEEC's. |
+| | **RL-PEGASIS** | The PEGASIS chain is unchanged; the leader is chosen by a learned value (BS distance, relative energy, chain-branch length) instead of fixed rotation, with an energy guard (only nodes with at least 0.5 x mean energy may lead). |
 | Proposed | **RL-Hybrid** | Online tabular Q-learning for both cluster assignment and multi-hop relay routing (below). |
-| Learner comparison | **Tabular Q, Double Q, Double DQN, Dueling Double DQN** | The same RL-Hybrid problem (environment, actions, reward, constraints) with a different learning method; Tabular Q is RL-Hybrid's own learner. |
+| Learner comparison | **Tabular Q-learning, Double Q-learning, Double DQN, Dueling DDQN** | The same RL-Hybrid problem (environment, actions, reward, constraints) with a different learning method; Tabular Q-learning is RL-Hybrid's own learner. |
 
 ## RL-Hybrid (the proposed router)
 
@@ -58,10 +58,10 @@ within seed-to-seed variation:
 
 | Learner | Delivery ratio (%) | Operational nodes at round 500 | Energy per delivered report (mJ) | Run time per seed (s) |
 |---|---|---|---|---|
-| Tabular Q | 29.3 ± 7.7 | 7.6 ± 0.9 | 8.8 ± 3.7 | 1.5 |
-| Double Q | 30.6 ± 9.6 | 7.8 ± 0.4 | 8.2 ± 4.2 | 1.5 |
+| Tabular Q-learning | 29.3 ± 7.7 | 7.6 ± 0.9 | 8.8 ± 3.7 | 1.5 |
+| Double Q-learning | 30.6 ± 9.6 | 7.8 ± 0.4 | 8.2 ± 4.2 | 1.5 |
 | Double DQN | 29.6 ± 8.1 | 7.8 ± 0.4 | 8.2 ± 3.5 | 14.9 |
-| Dueling Double DQN | 30.7 ± 5.4 | 8.0 ± 0.7 | 7.6 ± 2.0 | 15.8 |
+| Dueling DDQN | 30.7 ± 5.4 | 8.0 ± 0.7 | 7.6 ± 2.0 | 15.8 |
 
 Tabular Q-learning is used because no alternative gives a gain larger than the variation between seeds, while
 it needs about one tenth of the computation of the DQN learners, no neural network or replay memory, and
@@ -94,8 +94,8 @@ energy spent / reports delivered.
 2. **10-node network (this repository):** the 10 stations only, each sensing and forwarding.
 3. **Workload correction:** a fixed 1000-round reporting schedule and a fixed 1000-round energy-planning horizon,
    so that stopping at round 500 does not compress the workload or change RL budgets.
-4. **RL extensions v5:** the original extensions mostly reordered the parent's own choices and barely differed
-   from their parents. The v5 designs were developed on seeds 47-50 and evaluated on seeds 42-46 with a
+4. **RL extension redesign:** the first extension designs mostly reordered the parent's own choices and barely
+   differed from their parents. The final RL-LEACH, RL-DEEC and RL-PEGASIS designs were developed on seeds 47-50 and evaluated on seeds 42-46 with a
    selection rule fixed in advance.
 5. **Energy-accounting audit:** per-node energy tracing showed that clustering and chain frames were charged as
    one packet however many reports they carried. All methods were rerun with per-report charging; the results
@@ -103,41 +103,41 @@ energy spent / reports delivered.
 
 ## Results
 
-Round 500, mean ± sample SD over seeds 42-46 (`results/v2_results_500rounds_report_preserving.mat`).
+Round 500, mean ± sample SD over seeds 42-46 (`results/results_500rounds.mat`).
 
 | Method | Delivery ratio (%) | Source-packet PDR (%) | Operational nodes | Energy per delivered report (mJ) | FNF (round) | Mean delay (ms) |
 |---|---|---|---|---|---|---|
 | LEACH | 10.5 ± 4.3 | 61.4 ± 5.0 | 0.4 ± 0.5 | 40.1 ± 16.9 | 15 | 31.3 |
 | DEEC | 14.6 ± 2.5 | 68.6 ± 1.5 | 0.8 ± 0.4 | 24.7 ± 4.3 | 14 | 29.9 |
 | PEGASIS | 24.5 ± 5.0 | 66.4 ± 1.9 | 2.6 ± 0.5 | 10.5 ± 2.2 | 3 | 41.5 |
-| LEACH-RL v5 | 19.3 ± 11.1 | 65.0 ± 5.5 | 1.4 ± 1.9 | 26.0 ± 15.1 | 24 | 33.9 |
-| DEEC-RL v5 | 15.6 ± 8.7 | 61.6 ± 6.8 | 0.8 ± 1.1 | 31.2 ± 19.9 | 20 | 34.2 |
-| PEGASIS-RL v5 | 34.6 ± 4.6 | 61.9 ± 4.2 | 3.4 ± 1.7 | 8.2 ± 1.8 | 9 | 51.9 |
-| **RL-Hybrid** (Tabular Q) | 29.3 ± 7.7 | 32.8 ± 9.0 | **7.6 ± 0.9** | 8.8 ± 3.7 | **192** | 48.4 |
+| RL-LEACH | 19.3 ± 11.1 | 65.0 ± 5.5 | 1.4 ± 1.9 | 26.0 ± 15.1 | 24 | 33.9 |
+| RL-DEEC | 15.6 ± 8.7 | 61.6 ± 6.8 | 0.8 ± 1.1 | 31.2 ± 19.9 | 20 | 34.2 |
+| RL-PEGASIS | 34.6 ± 4.6 | 61.9 ± 4.2 | 3.4 ± 1.7 | 8.2 ± 1.8 | 9 | 51.9 |
+| **RL-Hybrid** (Tabular Q-learning) | 29.3 ± 7.7 | 32.8 ± 9.0 | **7.6 ± 0.9** | 8.8 ± 3.7 | **192** | 48.4 |
 
-Paired differences (RL extension - parent, same seeds): LEACH-RL v5 +8.75 ± 7.42 pp delivery ratio (higher in
-4 of 5 seeds); DEEC-RL v5 +0.93 ± 6.63 pp (3 of 5, within seed variation); PEGASIS-RL v5 +10.08 ± 3.26 pp
+Paired differences (RL extension - parent, same seeds): RL-LEACH +8.75 ± 7.42 pp delivery ratio (higher in
+4 of 5 seeds); RL-DEEC +0.93 ± 6.63 pp (3 of 5, within seed variation); RL-PEGASIS +10.08 ± 3.26 pp
 (5 of 5).
 
 **Interpretation.** RL-Hybrid keeps by far the most nodes operational (7.6 of 10 at round 500; first node
 failure near round 192) with one of the lowest energies per delivered report, i.e. the longest network
-lifetime. PEGASIS-RL v5 delivers the largest share of reports by round 500 (34.6%), but its network shrinks.
+lifetime. RL-PEGASIS delivers the largest share of reports by round 500 (34.6%), but its network shrinks.
 RL-Hybrid's source-packet PDR is lower than the clustering protocols' because its multi-hop routes cross more
 lossy links per report; its advantage is lifetime and sustained delivery, not per-packet reliability.
 
 ## Figures
 
-Six figures in the layout of the earlier 50-node study: three line panels (operational nodes, cumulative
+Six dashboard figures: three line panels (operational nodes, cumulative
 delivery ratio, total residual energy; mean with ±1 SD band), two bar panels (energy per delivered report and
 operational nodes at round 500; mean, SD whisker and the five seed values) and a five-seed summary table.
 
 | | |
 |---|---|
-| ![G1](figures/V1_STYLE_ALTERNATIVE/V2_G1_V1Style.png) **G1** Conventional protocols vs RL-Hybrid | ![G2](figures/V1_STYLE_ALTERNATIVE/V2_G2_V1Style.png) **G2** LEACH vs LEACH-RL v5 |
-| ![G3](figures/V1_STYLE_ALTERNATIVE/V2_G3_V1Style.png) **G3** DEEC vs DEEC-RL v5 | ![G4](figures/V1_STYLE_ALTERNATIVE/V2_G4_V1Style.png) **G4** PEGASIS vs PEGASIS-RL v5 |
-| ![G5](figures/V1_STYLE_ALTERNATIVE/V2_G5_V1Style.png) **G5** RL-Hybrid vs the RL extensions | ![G6](figures/V1_STYLE_ALTERNATIVE/V2_G6_V1Style.png) **G6** Learning-method comparison |
+| ![G1](figures/G1_Conventional_vs_RL_Hybrid.png) **G1** Conventional protocols vs RL-Hybrid | ![G2](figures/G2_LEACH_vs_RL_LEACH.png) **G2** LEACH vs RL-LEACH |
+| ![G3](figures/G3_DEEC_vs_RL_DEEC.png) **G3** DEEC vs RL-DEEC | ![G4](figures/G4_PEGASIS_vs_RL_PEGASIS.png) **G4** PEGASIS vs RL-PEGASIS |
+| ![G5](figures/G5_RL_Hybrid_vs_RL_Extensions.png) **G5** RL-Hybrid vs RL-LEACH, RL-DEEC and RL-PEGASIS | ![G6](figures/G6_Q_Learning_Methods.png) **G6** Q-learning method comparison |
 
-Editable MATLAB versions (`.fig`) are next to each PNG.
+Editable MATLAB figure files (`.fig`) are next to each PNG.
 
 ## Reproduce the results
 
@@ -145,24 +145,21 @@ Requirements: MATLAB (developed and validated with R2026a; no toolboxes) and the
 
 ```matlab
 cd Periyar-WSN-Adaptive-Routing
-run_v2_report_preserving()      % 11 methods x 5 seeds (about 5 minutes) -> results/v2_results_500rounds_report_preserving.mat
-plot_v2_final_v1style()         % the six figures -> figures/V1_STYLE_ALTERNATIVE/
+run_experiment('results/my_run.mat')    % 11 methods x 5 seeds (about 5 minutes); default output results/results_500rounds.mat
+plot_figures(fullfile(pwd, 'figures', 'my_run'))   % the six figures from results/results_500rounds.mat; default output figures/
 ```
 
-Both scripts refuse to overwrite existing outputs: rename or remove the result file first, or write the figures
-to a new folder with `plot_v2_final_v1style(fullfile(pwd, 'figures', 'my_run'))`.
-`plot_v2_final_report_preserving()` draws the same results in an alternative layout that also includes delay and
-cumulative delivered reports.
+Both functions refuse to overwrite existing outputs, so a rerun is written to a new file or folder as above.
 
 | Path | Contents |
 |---|---|
-| `v2_config.m` | All experiment settings (nodes, rounds, seeds, topology, dataset path) |
-| `run_v2_report_preserving.m` | Runs the experiment |
-| `plot_v2_final_v1style.m`, `plot_v2_final_report_preserving.m` | Figures (published layout; alternative layout) |
-| `protocols/` | LEACH, DEEC, PEGASIS, the three v5 RL extensions, RL-Hybrid and the learner comparison |
+| `wsn_config.m` | All experiment settings (nodes, rounds, seeds, topology, dataset path) |
+| `run_experiment.m` | Runs the experiment |
+| `plot_figures.m` | Draws the six figures |
+| `protocols/` | LEACH, DEEC, PEGASIS, RL-LEACH, RL-DEEC, RL-PEGASIS, RL-Hybrid and the learner comparison |
 | `simulation/` | Dataset loader, workload builder, scenario/channel generator, radio energy model, metric extraction |
-| `results/` | Final results; `v2_results_500rounds_corrected_detailed.mat` is an earlier validated run used only to check that topology and workload are unchanged |
-| `figures/V1_STYLE_ALTERNATIVE/` | The six figures (PNG and FIG) |
+| `results/` | `results_500rounds.mat` (final results); `reference_layout.mat` (node positions and workload, used to check that a rerun uses the same topology and workload) |
+| `figures/` | The six figures (PNG and FIG) |
 | `data/` | Place `consdata.xlsx` here (not included) |
 
 ## Dataset setup
@@ -181,12 +178,12 @@ described in [`data/README.md`](data/README.md), save it as `data/consdata.xlsx`
 ## File checksums (MD5)
 
 ```
-d50145dba16db7ce74a9111151e7ee2e  results/v2_results_500rounds_report_preserving.mat
-609271066cc63065eb4761cc2e8ff13f  results/v2_results_500rounds_corrected_detailed.mat
-57dda28249dd20da41dba71b43824a40  figures/V1_STYLE_ALTERNATIVE/V2_G1_V1Style.png
-3925737152671987e03332dde66ce013  figures/V1_STYLE_ALTERNATIVE/V2_G2_V1Style.png
-87071ba58e8aa1a727fa551971ecfd55  figures/V1_STYLE_ALTERNATIVE/V2_G3_V1Style.png
-d88901af094dd265de5d79cceff5514a  figures/V1_STYLE_ALTERNATIVE/V2_G4_V1Style.png
-5c6e9370c6dd85752d15894f64192d27  figures/V1_STYLE_ALTERNATIVE/V2_G5_V1Style.png
-e4db4e76f608e46fca268d81d346bc57  figures/V1_STYLE_ALTERNATIVE/V2_G6_V1Style.png
+407012aa28e86b4cca42d383a00919eb  results/results_500rounds.mat
+f7a7ab9290ac395274df75a1d15f86e2  results/reference_layout.mat
+ae56ca6ddc9341805995dea972bc0418  figures/G1_Conventional_vs_RL_Hybrid.png
+e457e8f296910c0d7e39e7f8793aa1ad  figures/G2_LEACH_vs_RL_LEACH.png
+0bbe5f6a9862b7a244bb79815dda57d2  figures/G3_DEEC_vs_RL_DEEC.png
+8735f2f12a2b6be9a7a06550460e1ba4  figures/G4_PEGASIS_vs_RL_PEGASIS.png
+4878ff6ca9ec0a4f47d4e0c78ce3a695  figures/G5_RL_Hybrid_vs_RL_Extensions.png
+43976f36b04361f5c09be6940e85ef5b  figures/G6_Q_Learning_Methods.png
 ```

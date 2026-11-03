@@ -1,9 +1,6 @@
 # Input dataset: not redistributed (see data/README.md); place your own copy at data/consdata.xlsx
 data/consdata.xlsx
 
-# Earlier layout of the final figures (kept locally; the published figures are figures/V1_STYLE_ALTERNATIVE/)
-figures/FINAL_SUBMISSION_REPORT_PRESERVING/
-
 # MATLAB autosave, editor and build artefacts
 *.asv
 *.m~

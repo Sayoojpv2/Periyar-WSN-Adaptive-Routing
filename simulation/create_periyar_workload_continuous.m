@@ -5,9 +5,9 @@ function workload = create_periyar_workload_continuous(wq_data, numRounds, mappi
 % River water-quality dataset under a causal sample-and-hold (Last Observation
 % Carried Forward - LOCF) application state model.
 %
-% V2: node_ids (station s -> node id, in the station order below) and numNodes
-% are inputs. Defaults reproduce V1 (50 nodes, stations on nodes 4, 8, ..., 48);
-% V2 uses 10 nodes with station s on node s.
+% node_ids (station s -> node id, in the station order below) and numNodes are inputs.
+% Defaults: 50 nodes with stations on nodes 4, 8, ..., 48; this project uses 10 nodes with
+% station s on node s.
 % scheduleRounds (default numRounds): length of the date-to-round schedule. A run shorter
 % than the schedule (e.g. numRounds 500, scheduleRounds 1000) reports exactly what rounds
 % 1..numRounds of the full schedule report, so the per-round workload does not depend on
@@ -15,9 +15,9 @@ function workload = create_periyar_workload_continuous(wq_data, numRounds, mappi
 %
 % Concept:
 %   Separates environmental data from network communication.
-%   - numNodes sensor nodes total (V1: 50; V2: 10)
+%   - numNodes sensor nodes total (10 in this project)
 %   - 10 fixed sensing stations (node_ids)
-%   - numNodes - 10 relay/routing nodes (V2: none)
+%   - numNodes - 10 relay/routing nodes (none in this project)
 %   - 1000 communication rounds
 %   - Exactly 10 application reports per round (1 from each sensing station)
 %   - Exactly 10,000 communication reports total
